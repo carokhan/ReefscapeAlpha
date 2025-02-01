@@ -29,6 +29,7 @@ public class Module {
 
   private final Alert driveDisconnectedAlert;
   private final Alert turnDisconnectedAlert;
+  private Rotation2d turnRelativeOffset = null;
   private SwerveModulePosition[] odometryPositions = new SwerveModulePosition[] {};
 
   public Module(ModuleIO io, int index) {
@@ -47,12 +48,18 @@ public class Module {
     io.updateInputs(inputs);
     Logger.processInputs("Drive/Module" + Integer.toString(index), inputs);
 
+    if (turnRelativeOffset == null && inputs.turnAbsolutePosition.getRadians() != 0.0) {
+      turnRelativeOffset = inputs.turnAbsolutePosition.minus(inputs.turnPosition);
+    }
+
     // Calculate positions for odometry
     int sampleCount = inputs.odometryTimestamps.length; // All signals are sampled together
     odometryPositions = new SwerveModulePosition[sampleCount];
     for (int i = 0; i < sampleCount; i++) {
-      double positionMeters = inputs.odometryDrivePositionsRad[i] * wheelRadiusMeters;
-      Rotation2d angle = inputs.odometryTurnPositions[i];
+      double positionMeters = inputs.odometryDrivePositionsRad[i] * wheelRadius;
+      Rotation2d angle =
+          inputs.odometryTurnPositions[i].plus(
+              turnRelativeOffset != null ? turnRelativeOffset : new Rotation2d());
       odometryPositions[i] = new SwerveModulePosition(positionMeters, angle);
     }
 
@@ -68,7 +75,7 @@ public class Module {
     state.cosineScale(inputs.turnPosition);
 
     // Apply setpoints
-    io.setDriveVelocity(state.speedMetersPerSecond / wheelRadiusMeters);
+    io.setDriveVelocity(state.speedMetersPerSecond / wheelRadius);
     io.setTurnPosition(state.angle);
   }
 
@@ -86,17 +93,21 @@ public class Module {
 
   /** Returns the current turn angle of the module. */
   public Rotation2d getAngle() {
-    return inputs.turnPosition;
+    if (turnRelativeOffset == null) {
+      return new Rotation2d();
+    } else {
+      return inputs.turnPosition.plus(turnRelativeOffset);
+    }
   }
 
   /** Returns the current drive position of the module in meters. */
   public double getPositionMeters() {
-    return inputs.drivePositionRad * wheelRadiusMeters;
+    return inputs.drivePositionRad * wheelRadius;
   }
 
   /** Returns the current drive velocity of the module in meters per second. */
   public double getVelocityMetersPerSec() {
-    return inputs.driveVelocityRadPerSec * wheelRadiusMeters;
+    return inputs.driveVelocityRadPerSec * wheelRadius;
   }
 
   /** Returns the module position (turn angle and drive position). */

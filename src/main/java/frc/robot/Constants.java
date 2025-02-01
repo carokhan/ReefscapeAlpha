@@ -14,6 +14,7 @@
 package frc.robot;
 
 import edu.wpi.first.wpilibj.RobotBase;
+import frc.robot.subsystems.drive.DriveConstants;
 
 /**
  * This class defines the runtime mode used by AdvantageKit. The mode is always "real" when running
@@ -33,5 +34,53 @@ public final class Constants {
 
     /** Replaying from a log file. */
     REPLAY
+  }
+
+  public static class RobotMap {
+    public static class Drive {
+      public static final int pigeon = 0;
+
+      public static final int frontLeftDrive = 1;
+      public static final int backLeftDrive = 5;
+      public static final int frontRightDrive = 3;
+      public static final int backRightDrive = 7;
+
+      public static final int frontLeftTurn = 2;
+      public static final int backLeftTurn = 6;
+      public static final int frontRightTurn = 4;
+      public static final int backRightTurn = 8;
+
+      public static final int frontLeftEncoder = 1;
+      public static final int backLeftEncoder = 2;
+      public static final int frontRightEncoder = 0;
+      public static final int backRightEncoder = 3;
+    }
+
+    public static class Elevator {
+      public static final int left = 30;
+      public static final int right = 31;
+    }
+
+    public static class Outtake {
+      public static final int top = 40;
+      public static final int bottom = 41;
+    }
+  }
+
+  public static class ControlConstants {
+    public static final double deadband = 0.1;
+    public static final double kPAngle = 5.0;
+    public static final double kDAngle = 0.4;
+    public static final double maxProfileAngularVelocity = DriveConstants.maxAngularVelocity;
+    public static final double maxProfileAngularAccel = DriveConstants.maxAngularAccel;
+
+    public static final double ffStartDelay = 2.0; // Secs
+    public static final double ffRampRate = 0.1; // Volts/Sec
+    public static final double wheelRadiusMaxVelocity = 0.25; // Rad/Sec
+    public static final double wheelRadiusRampRate = 0.05; // Rad/Sec^2
+  }
+
+  public static class SimConstants {
+    public static final double loopTime = 0.02;
   }
 }
