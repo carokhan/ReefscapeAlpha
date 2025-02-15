@@ -13,16 +13,11 @@
 
 package frc.robot;
 
-import edu.wpi.first.apriltag.AprilTagFieldLayout;
-import edu.wpi.first.apriltag.AprilTagFields;
-import edu.wpi.first.math.Matrix;
-import edu.wpi.first.math.VecBuilder;
+import com.pathplanner.lib.config.ModuleConfig;
+import com.pathplanner.lib.config.RobotConfig;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.geometry.Rotation3d;
-import edu.wpi.first.math.geometry.Transform3d;
-import edu.wpi.first.math.geometry.Translation3d;
-import edu.wpi.first.math.numbers.N1;
-import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.RobotBase;
 
@@ -64,6 +59,11 @@ public final class Constants {
       public static final int backLeftEncoder = 2;
       public static final int frontRightEncoder = 0;
       public static final int backRightEncoder = 3;
+
+      public static final Rotation2d frontLeftOffset = new Rotation2d(0.0);
+      public static final Rotation2d frontRightOffset = new Rotation2d(0.0);
+      public static final Rotation2d backLeftOffset = new Rotation2d(0.0);
+      public static final Rotation2d backRightOffset = new Rotation2d(0.0);
     }
 
     public static class Elevator {
@@ -84,8 +84,6 @@ public final class Constants {
     public static final double kPRotation = 3.0;
     public static final double kDRotation = 0.0;
 
-    public static final double mass = DriveConstants.mass;
-    public static final double moi = DriveConstants.angularMOI;
     public static final double bumperFront = Units.inchesToMeters(33.5 / 2);
     public static final double bumperBack = Units.inchesToMeters(33.5 / 2);
     public static final double bumperSide = Units.inchesToMeters(32.5 / 2);
@@ -93,13 +91,25 @@ public final class Constants {
     public static final double frontLeftY = DriveConstants.trackWidthX / 2;
     public static final double backModX = -DriveConstants.trackWidthY / 2;
     public static final double backLeftY = -DriveConstants.trackWidthX / 2;
-    public static final double wheelRadius = DriveConstants.wheelRadius;
     public static final double motorRevWheelRev = DriveConstants.driveRatio;
     public static final double motorMaxSpeed =
         5880 * 0.8 * Math.PI * 2 / 60; // RPM (free speed) * 0.8 * 2pi/60 =
     // radPerSec (loaded speed)
     public static final double motorMaxTorque =
         3.28 / 181 * DriveConstants.driveCurrent; // (kT * currentLimit)
+
+    public static final RobotConfig ppConfig =
+        new RobotConfig(
+            DriveConstants.mass,
+            DriveConstants.moi,
+            new ModuleConfig(
+                DriveConstants.wheelRadius,
+                DriveConstants.maxLinearVelocity,
+                DriveConstants.wheelCOF,
+                DriveConstants.driveGearbox.withReduction(DriveConstants.driveRatio),
+                DriveConstants.driveCurrent,
+                1),
+            DriveConstants.moduleTranslations);
   }
 
   public static class DriveConstants {
@@ -108,24 +118,37 @@ public final class Constants {
     public static final double trackWidthX = Units.inchesToMeters(19.75);
     public static final double trackWidthY = Units.inchesToMeters(20.75);
     public static final double trackBaseRadius = Math.hypot(trackWidthX / 2.0, trackWidthY / 2.0);
+    public static final Translation2d[] moduleTranslations = {
+      new Translation2d(trackWidthX / 2.0, trackWidthY / 2.0),
+      new Translation2d(trackWidthX / 2.0, -trackWidthY / 2.0),
+      new Translation2d(-trackWidthX / 2.0, trackWidthY / 2.0),
+      new Translation2d(-trackWidthX / 2.0, -trackWidthY / 2.0)
+    };
 
     public static final double wheelRadius = Units.inchesToMeters(2);
+    public static final double wheelCOF = 0.9;
 
-    public static final double mass = Units.lbsToKilograms(56);
+    public static final double mass = Units.lbsToKilograms(110);
+    public static final double moi = 2.42042257;
 
     public static final double driveRatio = 5.36;
     public static final double driveMOI = 0.025;
     public static final double turnRatio = 150.0 / 7.0;
     public static final double turnMOI = 0.004;
 
-    public static final double driveConversion = (driveRatio) * (1.0 / (wheelRadius * 2 * Math.PI));
+    public static final double driveConversion = 2 * Math.PI / driveRatio;
+    public static final double driveVelocityConversion = (2 * Math.PI) / 60.0 / driveRatio;
     public static final double turnConversion = 2 * Math.PI / turnRatio;
     public static final double turnVelocityConversion = turnConversion / 60;
+    public static final boolean turnInverted = false;
 
     public static final int driveCurrent = 40; // 70
     public static final int turnCurrent = 40; // 30
 
-    public static final double odometeryFrequency = 250;
+    public static final DCMotor driveGearbox = DCMotor.getNEO(1);
+    public static final DCMotor turnGearbox = DCMotor.getNEO(1);
+
+    public static final double odometryFrequency = 100.0;
     public static final double updateFrequency = 100;
 
     public static final double maxLinearVelocity = Units.feetToMeters(20.4);
@@ -143,6 +166,8 @@ public final class Constants {
 
     public static double kPTurnReal = 1.5; // 1.5?
     public static double kDTurnReal = 0.0;
+    public static double turnPIDMinInput = 0; // Radians
+    public static double turnPIDMaxInput = 2 * Math.PI; // Radians
 
     public static double kPDriveSim = 2.0;
     public static double kDDriveSim = 0.2;
@@ -173,65 +198,5 @@ public final class Constants {
 
   public static class SimConstants {
     public static final double loopTime = 0.02;
-  }
-
-  public static class VisionConstants {
-    public static final boolean useVision = true;
-
-    public static class CameraInfo {
-
-      public String cameraName;
-      public String model;
-      public Transform3d robotToCamera;
-      public Rotation2d diagFOV;
-      public int[] cameraRes;
-
-      public CameraInfo(
-          String cameraName,
-          String model,
-          Transform3d robotToCamera,
-          Rotation2d diagFOV,
-          int[] cameraRes) {
-        this.cameraName = cameraName;
-        this.model = model;
-        this.robotToCamera = robotToCamera;
-        this.diagFOV = diagFOV;
-        this.cameraRes = cameraRes;
-      }
-    }
-
-    public static CameraInfo leftCamera =
-        new CameraInfo(
-            "LeftCamera",
-            "Spinel OV9281-1086-B",
-            new Transform3d(
-                new Translation3d(
-                    Units.inchesToMeters(7.875),
-                    Units.inchesToMeters(10.25),
-                    Units.inchesToMeters(8.25)),
-                new Rotation3d(0.0, Units.degreesToRadians(-28.125), 0.0)
-                    .rotateBy(new Rotation3d(0.0, 0.0, Units.degreesToRadians(30.0)))),
-            Rotation2d.fromDegrees(95),
-            new int[] {1280, 720});
-
-    public static CameraInfo rightCamera =
-        new CameraInfo(
-            "RightCamera",
-            "Arducam OV2311-1086-A",
-            new Transform3d(
-                new Translation3d(
-                    Units.inchesToMeters(7.875),
-                    Units.inchesToMeters(-10.25),
-                    Units.inchesToMeters(8.25)),
-                new Rotation3d(0.0, Units.degreesToRadians(-28.125), 0.0)
-                    .rotateBy(new Rotation3d(0.0, 0.0, Units.degreesToRadians(-30.0)))),
-            Rotation2d.fromDegrees(75),
-            new int[] {1600, 1200});
-
-    public static final Matrix<N3, N1> singleTagStdDev =
-        VecBuilder.fill(0.8, 0.8, Double.MAX_VALUE);
-    public static final Matrix<N3, N1> multiTagStdDev = VecBuilder.fill(0.5, 0.5, Double.MAX_VALUE);
-    public static final AprilTagFieldLayout aprilTagFieldLayout =
-        AprilTagFields.k2024Crescendo.loadAprilTagLayoutField();
   }
 }
